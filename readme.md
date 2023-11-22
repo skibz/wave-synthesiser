@@ -1,5 +1,5 @@
 
-# wave-synthesiser
+# [wave-synthesiser](https://skibz.github.io/wave-synthesiser)
 
 it's just a very simple web app to generate arbitrary audio signals and display them with an oscilloscope-style visualisation.
 
