@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Wave Synthesiser</title>
+  </head>
+  <meta name='viewport' content='width=device-width,initial-scale=1'>
+  <style>
+    body {
+      margin: 2rem auto;
+      width: 768px;
+      font-family: sans-serif;
+    }
+
+    h1 {
+      display: inline;
+    }
+
+    button {
+      width: 125px;
+      height: 40px;
+    }
+
+    #visualiser {
+      width: 100%;
+      height: 350px;
+    }
+
+    #toggle {
+      display: block;
+    }
+
+    #controls-1 {
+      display: flex;
+      justify-content: space-evenly;
+      align-items: center;
+    }
+
+    ul {
+      list-style-type: none;
+      display: inline-block;
+    }
+
+    #controls-2,
+    #controls-2 div {
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+    }
+
+    #controls-2 > div {
+      margin: 1rem;
+    }
+
+    #controls-2 > div > div {
+      flex-direction: column;
+      margin: 1rem;
+    }
+  </style>
+  <body>
+
+    <fieldset>
+      <legend>
+        <h1>Wave Synthesiser</h1>&nbsp;<button id='enable'>Enable</button>
+      </legend>
+
+      <div id='controls-1'>
+        <button id='toggle'>Unmute</button>
+        <ul>
+          <li><span>Current frequency: </span><span id='frequency'>1.000000000</span><span>&nbsp;Hz</span></li>
+          <li><span>Set frequency: </span><input id='manual'><span>&nbsp;Hz</span></li>
+        </ul>
+        <button id='reset'>Reset</button>
+      </div>
+      <hr>
+      <div id='controls-2'>
+        <div>
+          <div>
+            <button id='freeze'>Freeze</button>
+          </div>
+
+          <div>
+            <button id='step-ten-up'>+10 Hz</button>
+            <br>
+            <button id='step-ten-down'>-10 Hz</button>
+          </div>
+
+          <div>
+            <button id='step-one-up'>+1 Hz</button>
+            <br>
+            <button id='step-one-down'>-1 Hz</button>
+          </div>
+
+          <div>
+            <button id='step-point-zero-one-up'>+0.01 Hz</button>
+            <br>
+            <button id='step-point-zero-one-down'>-0.01 Hz</button>
+          </div>
+        </div>
+      </div>
+
+      <canvas id='visualiser'></canvas>
+    </fieldset>
+
+    <script>
+
+        function enable_visualiser() {
+          a.fftSize = 2048
+          visualiser_data = new Uint8Array(a.fftSize)
+
+          c.clearRect(0, 0, visualiser.width, visualiser.height)
+
+          requestAnimationFrame(render_visualiser)
+        }
+
+        function render_visualiser(delta) {
+          a.getByteTimeDomainData(visualiser_data)
+
+          c.fillStyle = 'rgb(255, 255, 255)'
+          c.fillRect(0, 0, visualiser.width, visualiser.height)
+
+          c.lineWidth = 2
+          c.strokeStyle = 'rgb(0, 0, 0)'
+
+          c.beginPath()
+
+          var x = 0
+          var slice = (visualiser.width * 1.0) / a.fftSize
+
+          for (var i = 0; i < a.fftSize; i++) {
+            var y = ((visualiser_data[i] / 128.0) * visualiser.height) / 2
+
+            if (i === 0) {
+              c.moveTo(x, y)
+            } else {
+              c.lineTo(x, y)
+            }
+
+            x += slice
+          }
+
+          c.lineTo(visualiser.width, visualiser.height / 2)
+          c.stroke()
+
+          requestAnimationFrame(render_visualiser)
+        }
+
+        function render_audio(delta) {
+          if (direction === 'up') {
+            hz += speed
+          }
+
+          if (direction === 'down') {
+            hz -= speed
+          }
+
+          o.frequency.value = hz
+          frequency.textContent = hz.toFixed(9)
+
+          requestAnimationFrame(render_audio)
+        }
+
+        var visualiser = document.querySelector('#visualiser')
+        var frequency = document.querySelector('#frequency')
+        var enable = document.querySelector('#enable')
+        var toggle = document.querySelector('#toggle')
+        var manual = document.querySelector('#manual')
+        var freeze = document.querySelector('#freeze')
+        var reset = document.querySelector('#reset')
+        var step_ten_up = document.querySelector('#step-ten-up')
+        var step_ten_down = document.querySelector('#step-ten-down')
+        var step_one_up = document.querySelector('#step-one-up')
+        var step_one_down = document.querySelector('#step-one-down')
+        var step_point_zero_one_up = document.querySelector('#step-point-zero-one-up')
+        var step_point_zero_one_down = document.querySelector('#step-point-zero-one-down')
+
+        var enabled = false
+        var mute = true
+
+        var step_ten = 10
+        var step_one = 1
+        var step_point_zero_one = 0.01
+
+        // synthesiser context
+        var audio, o, g, a, c, visualiser_data
+
+        // default synthesiser parameters
+        var default_hz = 1
+        var hz = default_hz
+        var direction = ''
+        var volume = 0.8
+        var speed = 1
+
+        // audiocontext requires a user gesture
+        enable.onclick = function() {
+          if (enabled) return
+          enabled = true
+          enable.textContent = 'Enabled'
+          enable.disabled = true
+
+          audio = new AudioContext
+
+          c = visualiser.getContext('2d')
+
+          a = audio.createAnalyser()
+          a.minDecibels = -90
+          a.maxDecibels = -10
+
+          o = audio.createOscillator()
+          g = audio.createGain()
+
+          o.connect(g)
+          g.connect(audio.destination)
+          o.connect(a)
+
+          o.start()
+
+          o.frequency.value = hz
+          g.gain.value = 0
+
+          enable_visualiser()
+          requestAnimationFrame(render_audio)
+        }
+
+        manual.onchange = function(e) {
+          direction = ''
+
+          var next_hz = +e.target.value
+
+          if (isNaN(next_hz)) {
+            hz = default_hz
+            frequency.textContent = hz
+            return
+          }
+
+          hz = next_hz
+          frequency.textContent = hz
+        }
+
+        freeze.onclick = function() {
+          direction = ''
+        }
+
+        reset.onclick = function() {
+          direction = ''
+          hz = default_hz
+          manual.value = hz.toFixed(5)
+        }
+
+        step_ten_up.onclick = function() {
+          direction = 'up'
+          speed = step_ten
+        }
+
+        step_ten_down.onclick = function() {
+          direction = 'down'
+          speed = step_ten
+        }
+
+        step_one_up.onclick = function() {
+          direction = 'up'
+          speed = step_one
+        }
+
+        step_one_down.onclick = function() {
+          direction = 'down'
+          speed = step_one
+        }
+
+        step_point_zero_one_up.onclick = function() {
+          direction = 'up'
+          speed = step_point_zero_one
+        }
+
+        step_point_zero_one_down.onclick = function() {
+          direction = 'down'
+          speed = step_point_zero_one
+        }
+
+        toggle.onclick = function() {
+          if (mute) {
+            toggle.textContent = 'Mute'
+            g.gain.value = volume
+            mute = false
+          } else {
+            toggle.textContent = 'Unmute'
+            g.gain.value = 0
+            mute = true
+          }
+        }
+    </script>
+  </body>
+</html>
